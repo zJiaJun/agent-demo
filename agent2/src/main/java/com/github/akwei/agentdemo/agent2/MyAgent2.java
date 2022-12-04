@@ -1,9 +1,12 @@
 package com.github.akwei.agentdemo.agent2;
 
+import com.github.akwei.agentdemo.agent2.test.*;
 import net.bytebuddy.agent.builder.AgentBuilder;
+import net.bytebuddy.description.modifier.Visibility;
 import net.bytebuddy.dynamic.ClassFileLocator;
 import net.bytebuddy.dynamic.loading.ClassInjector;
 import net.bytebuddy.implementation.FieldAccessor;
+import net.bytebuddy.implementation.MethodDelegation;
 import net.bytebuddy.jar.asm.Opcodes;
 import net.bytebuddy.pool.TypePool;
 
@@ -27,42 +30,62 @@ public class MyAgent2 {
         }
     }
 
-//    public static void premain(String agentArgs, Instrumentation instrumentation) throws Exception {
-////        premain1(agentArgs, instrumentation);
-//        premain2(agentArgs, instrumentation);
-////        premain3(agentArgs, instrumentation);
-//
-//    }
+    public static void premain(String agentArgs, Instrumentation instrumentation) throws Exception {
+//        premain10(agentArgs, instrumentation);
+        premain20(agentArgs, instrumentation);
+//        premain30(agentArgs, instrumentation);
+//        premain40(agentArgs, instrumentation);
 
-//    public static void premain(String agentArgs, Instrumentation instrumentation) {
-//        ClassLoader agentClassLoader = MyAgent2.class.getClassLoader();
-//        new AgentBuilder.Default()
-//                .with(new AgentListener())
-//                .type(nameEndsWith("Bean"))
-//                .transform(new AgentBuilder.Transformer.ForAdvice()
-//                        .include(agentClassLoader)
-//                        .advice(nameStartsWith("printInfo"),
-//                                "com.github.akwei.agentdemo.agent2.Agent2Advice"))
-//                .installOn(instrumentation);
-//    }
+    }
 
-//    public static void premain(String agentArgs, Instrumentation instrumentation) throws Exception {
+    public static void premain10(String agentArgs, Instrumentation instrumentation) {
+        ClassLoader agentClassLoader = MyAgent2.class.getClassLoader();
+        new AgentBuilder.Default()
+                .with(new AgentListener())
+                .type(nameEndsWith("Bean"))
+                .transform(new AgentBuilder.Transformer.ForAdvice()
+                        .include(agentClassLoader)
+                        .advice(nameStartsWith("printInfo"),
+                                "com.github.akwei.agentdemo.agent2.Agent2Advice"))
+                .installOn(instrumentation);
+    }
+
+    public static void premain20(String agentArgs, Instrumentation instrumentation) throws Exception {
 //        injectToBootstrapClassLoader(instrumentation, "com.github.akwei.agentdemo.agent2.Agent2Advice2Delegate");
-//        ClassLoader agentClassLoader = MyAgent2.class.getClassLoader();
-//        new AgentBuilder.Default()
-//                .with(new AgentListener())
-//                .type(nameEndsWith("Bean"))
-//                .transform((builder, typeDescription, classLoader, module) -> {
-//                    addUserClassLoader(agentClassLoader, classLoader);
-//                    return new AgentBuilder.Transformer.ForAdvice()
-//                            .include(agentClassLoader)
-//                            .advice(nameStartsWith("printInfo"), "com.github.akwei.agentdemo.agent2.Agent2Advice2")
-//                            .transform(builder, typeDescription, classLoader, module);
-//                })
-//                .installOn(instrumentation);
-//    }
+        injectToBootstrapClassLoader(instrumentation, "com.github.akwei.agentdemo.agent2.test.TestDispatcher");
+        injectToBootstrapClassLoader(instrumentation, "com.github.akwei.agentdemo.agent2.test.TestAction");
+        injectToBootstrapClassLoader(instrumentation, "com.github.akwei.agentdemo.agent2.test.TestFieldAccessor");
+        injectToBootstrapClassLoader(instrumentation, "com.github.akwei.agentdemo.agent2.test.TestMethodDelegate");
+        ClassLoader agentClassLoader = MyAgent2.class.getClassLoader();
+        new AgentBuilder.Default()
+                .with(new AgentListener())
+                .type(nameEndsWith("Bean"))
+                //动态添加字段
+                .transform((builder, typeDescription, classLoader, javaModule) ->
+                        builder.defineField("value", Object.class, Opcodes.ACC_PUBLIC)
+                            .implement(TestFieldAccessor.class)
+                            .intercept(FieldAccessor.ofField("value")))
+                //动态添加方法
+                .transform(((builder, typeDescription, classLoader, javaModule) ->
+                        builder.defineMethod("newMethod", String.class, Visibility.PRIVATE)
+                                .withParameters(String.class, Long.class, Boolean.class)
+                                .intercept(MethodDelegation.to(TestMethodDelegate.class)))
+                )
+                .transform((builder, typeDescription, classLoader, module) -> {
+                    System.out.println("transform classloader " + classLoader);
+                    addUserClassLoader(agentClassLoader, classLoader);
+                    TestAction testAction = newInstance("com.github.akwei.agentdemo.agent2.test.TestActionImpl", agentClassLoader);
+                    System.out.println("transform test action classloader " + testAction.getClass().getClassLoader());
+                    TestDispatcher.setAction("test",  testAction);
+                    return new AgentBuilder.Transformer.ForAdvice()
+                            .include(agentClassLoader)
+                            .advice(nameStartsWith("printInfo"), "com.github.akwei.agentdemo.agent2.test.TestAdvice")
+                            .transform(builder, typeDescription, classLoader, module);
+                })
+                .installOn(instrumentation);
+    }
 
-    public static void premain(String agentArgs, Instrumentation instrumentation)
+    public static void premain30(String agentArgs, Instrumentation instrumentation)
             throws Exception {
         injectToBootstrapClassLoader(instrumentation,
                 "com.github.akwei.agentdemo.agent2.Dispatcher");
@@ -112,8 +135,7 @@ public class MyAgent2 {
                 .installOn(instrumentation);
     }
 
-    public static void premain4(String agentArgs, Instrumentation instrumentation)
-            throws Exception {
+    public static void premain40(String agentArgs, Instrumentation instrumentation) throws Exception {
         injectToBootstrapClassLoader(instrumentation,
                 "com.github.akwei.agentdemo.agent2.Dispatcher");
         injectToBootstrapClassLoader(instrumentation,

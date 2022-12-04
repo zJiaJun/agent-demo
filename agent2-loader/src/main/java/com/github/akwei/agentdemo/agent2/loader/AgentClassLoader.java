@@ -21,6 +21,9 @@ public class AgentClassLoader extends LaunchedURLClassLoader {
     @Override
     protected Class<?> loadClass(String name, boolean resolve) throws ClassNotFoundException {
         try {
+            if (name.startsWith("com.github.akwei")) {
+                System.out.println("AgentClassLoader: " + name);
+            }
             return super.loadClass(name, resolve);
         } catch (ClassNotFoundException e) {
             for (ClassLoader external : otherClassLoaders) {
